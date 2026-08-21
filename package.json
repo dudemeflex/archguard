@@ -1,7 +1,7 @@
 {
   "name": "archguard",
   "version": "0.1.0",
-  "description": "Architecture policy checks for JavaScript and TypeScript repositories",
+  "description": "Deterministic CLI for Git change detection and architecture rule enforcement",
   "main": "dist/src/index.js",
   "bin": {
     "archguard": "dist/src/index.js"
@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
     "test": "vitest --run",
     "lint": "eslint \"src/**/*.{ts,js}\" \"test/**/*.{ts,js}\" --max-warnings=0"
   },
@@ -32,4 +33,3 @@
     "@typescript-eslint/eslint-plugin": "^6.10.0"
   }
 }
-

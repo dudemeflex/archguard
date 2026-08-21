@@ -23,4 +23,5 @@ jobs:
         run: npm test --silent
       - name: Build
         run: npm run build
-    permissions: {}
+    permissions:
+      contents: read

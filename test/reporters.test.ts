@@ -1,25 +1,31 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TerminalReporter } from '../src/reporters';
 import { JsonReporter } from '../src/reporters/json';
-import { scanNotImplemented } from '../src/commands/scan';
 
 import type { ScanResult } from '../src/types';
 
 describe('reporters', () => {
-  it('terminal reporter handles empty findings', async () => {
+  it('terminal reporter handles empty findings without claiming rule evaluation passed', async () => {
     const r = new TerminalReporter();
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     await r.report({ findings: [] });
-    expect(spy).toHaveBeenCalledWith('No findings.');
+    expect(spy).toHaveBeenCalledWith('Comparing:');
+    expect(spy).toHaveBeenCalledWith('Architecture analysis is not implemented yet.');
     spy.mockRestore();
   });
 
-  it('terminal reporter prints a finding concisely', async () => {
+  it('terminal reporter prints a concise change summary', async () => {
     const r = new TerminalReporter();
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const res: ScanResult = { findings: [{ ruleId: 'r1', severity: 'error', title: 'Domain boundary', message: 'Domain cannot depend on infra', file: 'src/domain.ts', line: 4 }] };
-        await r.report(res);
-    expect(spy).toHaveBeenCalled();
+    const res: ScanResult = {
+      comparison: { base: 'main', head: 'HEAD' },
+      findings: [],
+      changes: [{ type: 'modified', path: 'src/domain.ts' }, { type: 'renamed', oldPath: 'src/old.ts', path: 'src/new.ts' }]
+    };
+    await r.report(res);
+    expect(spy).toHaveBeenCalledWith('ArchGuard');
+    expect(spy).toHaveBeenCalledWith('Comparing:');
+    expect(spy).toHaveBeenCalledWith('  M  src/domain.ts');
     spy.mockRestore();
   });
 
@@ -27,17 +33,11 @@ describe('reporters', () => {
     const r = new JsonReporter();
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const res: ScanResult = { findings: [{ ruleId: 'r1', severity: 'warning', title: 'T', message: 'm' }] };
-        await r.report(res);
+    await r.report(res);
     expect(spy).toHaveBeenCalled();
     const outArg = spy.mock.calls[0][0] as string;
     const parsed = JSON.parse(outArg);
     expect(parsed).toHaveProperty('summary');
     spy.mockRestore();
-  });
-
-  it('scanNotImplemented returns code 2', () => {
-    const info = scanNotImplemented();
-    expect(info.code).toBe(2);
-    expect(info.message).toMatch(/not implemented/i);
   });
 });

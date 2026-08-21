@@ -1,5 +1,5 @@
-import { Reporter } from '../interfaces';
-import { ScanResult } from '../types';
+import type { Reporter } from '../interfaces';
+import type { ScanResult } from '../types';
 
 export class JsonReporter implements Reporter {
   async report(result: ScanResult): Promise<void> {
@@ -12,11 +12,13 @@ export class JsonReporter implements Reporter {
     }
 
     const output = {
+      comparison: result.comparison ?? { base: 'unknown', head: 'HEAD' },
+      changes: result.changes || [],
       findings,
+      stats: result.stats || {},
       summary
     } as const;
 
-    // deterministic JSON output
     console.log(JSON.stringify(output, null, 2));
   }
 }

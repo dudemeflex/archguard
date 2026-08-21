@@ -27,9 +27,13 @@ export interface ArchitectureGraphView {
   getLayers(): string[];
 }
 
-import { Finding } from './finding';
+import type { Finding } from './finding';
 
 export interface ScanResult {
+  comparison?: {
+    base: string;
+    head: string;
+  };
   findings: Finding[];
   changes?: RepositoryChange[];
   stats?: {
