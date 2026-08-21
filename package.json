@@ -1,0 +1,35 @@
+{
+  "name": "archguard",
+  "version": "0.1.0",
+  "description": "Architecture policy checks for JavaScript and TypeScript repositories",
+  "main": "dist/src/index.js",
+  "bin": {
+    "archguard": "dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest --run",
+    "lint": "eslint \"src/**/*.{ts,js}\" \"test/**/*.{ts,js}\" --max-warnings=0"
+  },
+  "keywords": ["architecture", "scanner", "cli"],
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "yargs": "^17.7.2",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "vitest": "^1.4.3",
+    "ts-node": "^10.9.1",
+    "@types/node": "^20.5.6",
+    "@types/yargs": "^17.0.18",
+    "@types/js-yaml": "^4.0.5",
+    "eslint": "^8.50.0",
+    "@typescript-eslint/parser": "^6.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.10.0"
+  }
+}
+
