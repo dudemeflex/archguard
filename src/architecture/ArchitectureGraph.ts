@@ -1,14 +1,10 @@
-import picomatch from 'picomatch';
 import type { ArchguardConfig } from '../config/schema';
 import type { ArchitectureGraph } from '../interfaces';
+import { compileRepositoryGlob, normalizeRepositoryPath } from './globs';
 
 interface CompiledLayer {
   name: string;
-  matchers: Array<ReturnType<typeof picomatch>>;
-}
-
-function normalizeRepositoryPath(filePath: string): string {
-  return filePath.replace(/\\/g, '/').replace(/^\.\//, '');
+  matchers: Array<ReturnType<typeof compileRepositoryGlob>>;
 }
 
 export class ArchitectureGraphImpl implements ArchitectureGraph {
@@ -17,12 +13,7 @@ export class ArchitectureGraphImpl implements ArchitectureGraph {
   constructor(config: Pick<ArchguardConfig, 'layers'>) {
     this.layers = config.layers.map(layer => ({
       name: layer.name,
-      matchers: layer.matches.map(pattern => picomatch(normalizeRepositoryPath(pattern), {
-        dot: true,
-        nonegate: true,
-        posixSlashes: true,
-        strictBrackets: true
-      }))
+      matchers: layer.matches.map(compileRepositoryGlob)
     }));
   }
 

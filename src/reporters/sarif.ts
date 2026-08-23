@@ -2,7 +2,37 @@ import type { Finding, Severity } from '../finding';
 import type { Reporter } from '../interfaces';
 import type { ScanResult } from '../types';
 
-const ARCHITECTURE_RULE_ID = 'architecture/dependency';
+const RULE_METADATA: Record<string, {
+  name: string;
+  shortDescription: string;
+  fullDescription: string;
+  tags: string[];
+}> = {
+  'architecture/dependency': {
+    name: 'ArchitectureDependency',
+    shortDescription: 'Forbidden architecture dependency',
+    fullDescription: 'A source file depends on a layer that is not allowed by the repository architecture configuration.',
+    tags: ['architecture', 'dependency']
+  },
+  'architecture/companion-change': {
+    name: 'ArchitectureCompanionChange',
+    shortDescription: 'Required companion change missing',
+    fullDescription: 'A changed architecture layer does not have a required matching companion change.',
+    tags: ['architecture', 'change-policy']
+  },
+  'architecture/unmapped-file': {
+    name: 'ArchitectureUnmappedFile',
+    shortDescription: 'Unmapped changed source file',
+    fullDescription: 'A changed source file is not covered by any configured architecture layer.',
+    tags: ['architecture', 'coverage']
+  },
+  'architecture/overlapping-layers': {
+    name: 'ArchitectureOverlappingLayers',
+    shortDescription: 'Overlapping architecture layers',
+    fullDescription: 'A changed source file is covered by more than one configured architecture layer.',
+    tags: ['architecture', 'coverage']
+  }
+};
 
 function sarifLevel(severity: Severity | undefined): 'error' | 'warning' | 'note' {
   if (severity === 'error') return 'error';
@@ -12,22 +42,20 @@ function sarifLevel(severity: Severity | undefined): 'error' | 'warning' | 'note
 
 function ruleDefinition(finding: Finding) {
   const id = finding.ruleId || 'archguard/finding';
-  const architectureRule = id === ARCHITECTURE_RULE_ID;
+  const metadata = RULE_METADATA[id];
 
   return {
     id,
-    name: architectureRule ? 'ArchitectureDependency' : id.replace(/[^a-zA-Z0-9]/g, '_'),
+    name: metadata?.name || id.replace(/[^a-zA-Z0-9]/g, '_'),
     shortDescription: {
-      text: finding.title || (architectureRule ? 'Forbidden architecture dependency' : 'ArchGuard finding')
+      text: finding.title || metadata?.shortDescription || 'ArchGuard finding'
     },
     fullDescription: {
-      text: architectureRule
-        ? 'A source file depends on a layer that is not allowed by the repository architecture configuration.'
-        : 'ArchGuard reported a repository architecture finding.'
+      text: metadata?.fullDescription || 'ArchGuard reported a repository architecture finding.'
     },
     defaultConfiguration: { level: sarifLevel(finding.severity) },
     properties: {
-      tags: architectureRule ? ['architecture', 'dependency'] : ['architecture']
+      tags: metadata?.tags || ['architecture']
     }
   };
 }

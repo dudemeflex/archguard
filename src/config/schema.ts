@@ -15,9 +15,15 @@ export const RuleSchema = z.object({
   allow: z.boolean().optional().default(false)
 }).strict();
 
+export const CoverageSchema = z.object({
+  requireMappedChangedFiles: z.boolean().optional().default(false),
+  forbidOverlappingLayers: z.boolean().optional().default(false)
+}).strict();
+
 export const ConfigSchema = z.object({
   // Currently supported config schema version
   version: z.literal(1),
+  coverage: CoverageSchema.optional(),
   layers: z.array(LayerSchema).nonempty(),
   rules: z.array(RuleSchema).optional().default([])
 }).strict();

@@ -1,5 +1,10 @@
 import { ScanResult } from '../types';
 import { Reporter as ReporterInterface } from '../interfaces';
+import { emptyArchitectureImpact } from '../impact/empty';
+
+export interface TerminalReporterOptions {
+  detailedImpact?: boolean;
+}
 
 function formatChangeType(type: string): string {
   switch (type) {
@@ -17,6 +22,8 @@ function formatChangeType(type: string): string {
 }
 
 export class TerminalReporter implements ReporterInterface {
+  constructor(private readonly options: TerminalReporterOptions = {}) {}
+
   async report(result: ScanResult): Promise<void> {
     const findings = result.findings || [];
     const changes = result.changes || [];
@@ -24,6 +31,7 @@ export class TerminalReporter implements ReporterInterface {
     const graph = result.dependencyGraph || {};
     const filesAnalyzed = Object.keys(graph).length;
     const edgesAnalyzed = Object.values(graph).reduce((sum, edges) => sum + edges.length, 0);
+    const impact = result.impact ?? emptyArchitectureImpact();
 
     console.log('ArchGuard');
     console.log('');
@@ -50,6 +58,38 @@ export class TerminalReporter implements ReporterInterface {
     console.log('Dependency analysis:');
     console.log(`  ${filesAnalyzed} source files analyzed`);
     console.log(`  ${edgesAnalyzed} local dependency edges`);
+    console.log('');
+
+    console.log('Architecture impact:');
+    console.log(`  Layers touched: ${impact.layersTouched.join(', ') || '(none)'}`);
+    console.log(`  Cross-layer dependencies: ${impact.crossLayerDependencies.length}`);
+    console.log(`  Unmapped changed source files: ${impact.unmappedChangedFiles.length}`);
+    console.log(`  Overlapping layer assignments: ${impact.overlappingChangedFiles.length}`);
+
+    if (this.options.detailedImpact) {
+      if (impact.crossLayerDependencies.length > 0) {
+        console.log('');
+        console.log('Cross-layer dependencies:');
+        for (const dependency of impact.crossLayerDependencies) {
+          console.log('');
+          console.log(`${dependency.sourceLayer} -> ${dependency.targetLayer}`);
+          console.log(`  ${dependency.source}`);
+          console.log(`  -> ${dependency.target}`);
+        }
+      }
+      if (impact.unmappedChangedFiles.length > 0) {
+        console.log('');
+        console.log('Unmapped changed source files:');
+        for (const file of impact.unmappedChangedFiles) console.log(`  ${file}`);
+      }
+      if (impact.overlappingChangedFiles.length > 0) {
+        console.log('');
+        console.log('Overlapping layer assignments:');
+        for (const overlap of impact.overlappingChangedFiles) {
+          console.log(`  ${overlap.file}: ${overlap.layers.join(', ')}`);
+        }
+      }
+    }
     console.log('');
 
     console.log('Architecture rules:');

@@ -1,4 +1,4 @@
-import { CommandModule } from 'yargs';
+import type { CommandModule } from 'yargs';
 import fs from 'fs';
 import path from 'path';
 import { sampleConfig } from '../config/sample';

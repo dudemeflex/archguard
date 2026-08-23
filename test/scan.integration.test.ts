@@ -4,7 +4,19 @@ import path from 'path';
 import os from 'os';
 import { execFileSync, spawnSync } from 'child_process';
 import { performScan } from '../src/commands/scan';
-import { sampleConfig } from '../src/config/sample';
+
+const sampleConfig = `version: 1
+layers:
+  - name: infrastructure
+    matches: ["src/infrastructure/**"]
+    mayDependOn: [domain]
+  - name: domain
+    matches: ["src/domain/**"]
+    mayDependOn: []
+  - name: application
+    matches: ["src/application/**"]
+    mayDependOn: [domain]
+`;
 
 function runGit(cwd: string, args: string[]) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();

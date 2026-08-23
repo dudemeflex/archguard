@@ -1,19 +1,37 @@
 export const sampleConfig = `# ArchGuard config (schema version 1)
-# Cross-layer dependencies must be listed in mayDependOn.
 version: 1
+
+coverage:
+  requireMappedChangedFiles: false
+  forbidOverlappingLayers: false
+
 layers:
-  - name: infrastructure
+  - name: ui
     matches:
-      - "src/infrastructure/**"
+      - "src/ui/**"
     mayDependOn:
-      - domain
-  - name: domain
-    matches:
-      - "src/domain/**"
-    mayDependOn: []
+      - application
+      - shared
+
   - name: application
     matches:
       - "src/application/**"
     mayDependOn:
       - domain
+      - shared
+    companionChange:
+      - "test/application/**"
+
+  - name: domain
+    matches:
+      - "src/domain/**"
+    mayDependOn:
+      - shared
+    companionChange:
+      - "test/domain/**"
+
+  - name: shared
+    matches:
+      - "src/shared/**"
+    mayDependOn: []
 `;

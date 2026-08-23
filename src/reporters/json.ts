@@ -1,5 +1,6 @@
 import type { Reporter } from '../interfaces';
 import type { ScanResult } from '../types';
+import { emptyArchitectureImpact } from '../impact/empty';
 
 export function renderJson(result: ScanResult): string {
   const findings = result.findings || [];
@@ -14,6 +15,7 @@ export function renderJson(result: ScanResult): string {
     comparison: result.comparison ?? { base: 'unknown', head: 'HEAD' },
     changes: result.changes || [],
     dependencyGraph: result.dependencyGraph || {},
+    impact: result.impact || emptyArchitectureImpact(),
     findings,
     stats: result.stats || {},
     summary

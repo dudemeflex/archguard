@@ -15,6 +15,21 @@ export interface DependencyEdge {
 
 export type DependencyGraph = Record<string, DependencyEdge[]>;
 
+export interface ArchitectureImpact {
+  layersTouched: string[];
+  crossLayerDependencies: Array<{
+    sourceLayer: string;
+    targetLayer: string;
+    source: string;
+    target: string;
+  }>;
+  unmappedChangedFiles: string[];
+  overlappingChangedFiles: Array<{
+    file: string;
+    layers: string[];
+  }>;
+}
+
 export interface ArchitectureLayer {
   name: string;
   matches: string[];
@@ -37,6 +52,7 @@ export interface ScanResult {
   findings: Finding[];
   changes?: RepositoryChange[];
   dependencyGraph?: DependencyGraph;
+  impact?: ArchitectureImpact;
   stats?: {
     changedFiles?: number;
     filesAnalyzed?: number;

@@ -1,5 +1,5 @@
 import type { ArchguardConfig } from '../config/schema';
-import type { RuleEvaluator } from '../interfaces';
+import type { ArchitectureGraph, RuleEvaluator } from '../interfaces';
 import type { Finding } from '../finding';
 import type { DependencyEdge, DependencyGraph } from '../types';
 import { ArchitectureGraphImpl } from '../architecture/ArchitectureGraph';
@@ -31,8 +31,10 @@ function formatEvidence(edge: DependencyEdge): string {
 }
 
 export class ArchitectureRuleEvaluator implements RuleEvaluator {
+  constructor(private readonly architecture?: ArchitectureGraph) {}
+
   async evaluate(graph: DependencyGraph, config: ArchguardConfig): Promise<Finding[]> {
-    const architecture = new ArchitectureGraphImpl(config);
+    const architecture = this.architecture ?? new ArchitectureGraphImpl(config);
     const allowedDependencies = new Map(
       config.layers.map(layer => [layer.name, new Set(layer.mayDependOn ?? [])])
     );

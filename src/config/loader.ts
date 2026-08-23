@@ -3,6 +3,16 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { ConfigSchema, ArchguardConfig } from './schema';
 import { ZodError } from 'zod';
+import { compileRepositoryGlob } from '../architecture/globs';
+
+function validateGlob(pattern: string, location: string): void {
+  try {
+    compileRepositoryGlob(pattern);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Invalid glob in ${location}: "${pattern}": ${message}`);
+  }
+}
 
 export function loadConfig(cwd = process.cwd(), configPath = '.archguard.yml'): ArchguardConfig | null {
   const target = path.resolve(cwd, configPath);
@@ -51,6 +61,12 @@ export function loadConfig(cwd = process.cwd(), configPath = '.archguard.yml'): 
         if (!layerNames.includes(d)) {
           throw new Error(`Layer '${layer.name}' mayDependOn references unknown layer '${d}'`);
         }
+      }
+      for (const pattern of layer.matches) {
+        validateGlob(pattern, `layer '${layer.name}' matches`);
+      }
+      for (const pattern of layer.companionChange || []) {
+        validateGlob(pattern, `layer '${layer.name}' companionChange`);
       }
     }
 

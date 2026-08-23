@@ -1,18 +1,21 @@
-import fs from 'fs';
-import path from 'path';
-import { CommandModule } from 'yargs';
+import type { CommandModule } from 'yargs';
 import { loadConfig } from '../config/loader';
 import { GitAdapterImpl } from '../git/GitAdapter';
 import { TypeScriptDependencyAnalyzer } from '../dependencies/TypeScriptDependencyAnalyzer';
 import { ArchitectureRuleEvaluator } from '../rules/ArchitectureRuleEvaluator';
+import { CompanionChangeEvaluator } from '../rules/CompanionChangeEvaluator';
+import { CoverageRuleEvaluator } from '../rules/CoverageRuleEvaluator';
+import { ArchitectureGraphImpl } from '../architecture/ArchitectureGraph';
+import { ArchitectureImpactAnalyzer } from '../impact/ArchitectureImpactAnalyzer';
 import { TerminalReporter } from '../reporters';
 import { JsonReporter, renderJson } from '../reporters/json';
 import { GithubReporter } from '../reporters/github';
 import { SarifReporter, renderSarif } from '../reporters/sarif';
 import type { Finding } from '../finding';
-import type { DependencyGraph, ScanResult } from '../types';
+import type { ArchitectureImpact, DependencyGraph, ScanResult } from '../types';
+import { isSupportedSourcePath } from '../sourceFiles';
+import { emitOutput } from '../output';
 
-const SUPPORTED_SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs']);
 export type ScanFormat = 'pretty' | 'json' | 'github' | 'sarif';
 
 export interface ScanOptions {
@@ -21,11 +24,9 @@ export interface ScanOptions {
   format?: ScanFormat;
   output?: string;
   configPath?: string;
+  strict?: boolean;
+  impact?: boolean;
   cwd?: string;
-}
-
-function isSupportedSourcePath(filePath: string): boolean {
-  return SUPPORTED_SOURCE_EXTENSIONS.has(path.extname(filePath).toLowerCase());
 }
 
 export async function performScan(opts: ScanOptions): Promise<{ result?: ScanResult; exitCode: number; error?: string }> {
@@ -72,9 +73,19 @@ export async function performScan(opts: ScanOptions): Promise<{ result?: ScanRes
   }
 
   let findings: Finding[];
+  let impact: ArchitectureImpact;
   try {
-    const evaluator = new ArchitectureRuleEvaluator();
-    findings = await evaluator.evaluate(dependencyGraph, cfg);
+    const architecture = new ArchitectureGraphImpl(cfg);
+    impact = new ArchitectureImpactAnalyzer(architecture).analyze(changes, dependencyGraph);
+    const dependencyFindings = await new ArchitectureRuleEvaluator(architecture)
+      .evaluate(dependencyGraph, cfg);
+    const companionFindings = new CompanionChangeEvaluator(cfg, architecture).evaluate(changes);
+    const coveragePolicy = {
+      requireMappedChangedFiles: opts.strict || cfg.coverage?.requireMappedChangedFiles || false,
+      forbidOverlappingLayers: opts.strict || cfg.coverage?.forbidOverlappingLayers || false
+    };
+    const coverageFindings = new CoverageRuleEvaluator().evaluate(impact, coveragePolicy);
+    findings = [...dependencyFindings, ...companionFindings, ...coverageFindings];
   } catch (err) {
     return { exitCode: 2, error: (err as Error).message };
   }
@@ -91,6 +102,7 @@ export async function performScan(opts: ScanOptions): Promise<{ result?: ScanRes
     findings,
     changes,
     dependencyGraph,
+    impact,
     stats: {
       changedFiles: changes.length,
       filesAnalyzed: Object.keys(dependencyGraph).length,
@@ -102,7 +114,7 @@ export async function performScan(opts: ScanOptions): Promise<{ result?: ScanRes
   try {
     if (opts.output) {
       const rendered = format === 'sarif' ? renderSarif(result) : renderJson(result);
-      fs.writeFileSync(path.resolve(cwd, opts.output), `${rendered}\n`, 'utf8');
+      emitOutput(rendered, opts.output, cwd);
     } else if (format === 'json') {
       await new JsonReporter().report(result);
     } else if (format === 'sarif') {
@@ -110,7 +122,7 @@ export async function performScan(opts: ScanOptions): Promise<{ result?: ScanRes
     } else if (format === 'github') {
       await new GithubReporter().report(result);
     } else {
-      await new TerminalReporter().report(result);
+      await new TerminalReporter({ detailedImpact: opts.impact }).report(result);
     }
   } catch (err) {
     return { exitCode: 2, error: (err as Error).message };
@@ -121,25 +133,29 @@ export async function performScan(opts: ScanOptions): Promise<{ result?: ScanRes
 
 export const scanCommand: CommandModule = {
   command: 'scan',
-  describe: 'Run an architecture scan (experimental)',
+  describe: 'Scan changed source files against architecture policy',
   builder: {
     base: { type: 'string', demandOption: false, describe: 'Git base revision' },
     head: { type: 'string', demandOption: false, describe: 'Git head revision (default: HEAD)' },
     format: { type: 'string', choices: ['pretty', 'json', 'github', 'sarif'], default: 'pretty', describe: 'Output format' },
-    output: { type: 'string', describe: 'Write JSON or SARIF output to a file' }
+    output: { type: 'string', describe: 'Write JSON or SARIF output to a file' },
+    strict: { type: 'boolean', default: false, describe: 'Require mapped files and exclusive layer matches for this scan' },
+    impact: { type: 'boolean', default: false, describe: 'Show detailed architecture impact in pretty output' }
   },
   handler: async (argv) => {
     const base = argv.base as string | undefined;
     const head = (argv.head as string | undefined) || 'HEAD';
     const format = argv.format as ScanFormat;
     const output = argv.output as string | undefined;
+    const strict = argv.strict as boolean;
+    const impact = argv.impact as boolean;
 
     if (!base) {
       console.error('Missing required --base argument');
       process.exit(2);
     }
 
-    const { exitCode, error } = await performScan({ base, head, format, output });
+    const { exitCode, error } = await performScan({ base, head, format, output, strict, impact });
     if (error) {
       console.error(error);
     }

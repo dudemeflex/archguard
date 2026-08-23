@@ -38,12 +38,35 @@ describe('GitHub integration', () => {
           severity: 'warning',
           message: 'A second dependency is discouraged.',
           file: 'src/ui/Other.ts'
+        },
+        {
+          ruleId: 'architecture/companion-change',
+          severity: 'error',
+          message: 'A companion change is required.',
+          file: 'src/domain/user.ts'
+        },
+        {
+          ruleId: 'architecture/unmapped-file',
+          severity: 'error',
+          message: 'The file is unmapped.',
+          file: 'src/legacy/foo.ts'
+        },
+        {
+          ruleId: 'architecture/overlapping-layers',
+          severity: 'error',
+          message: 'The file overlaps layers.',
+          file: 'src/domain/shared.ts'
         }
       ]
     });
 
     expect(sarif.version).toBe('2.1.0');
-    expect(sarif.runs[0].tool.driver.rules).toHaveLength(1);
+    expect(sarif.runs[0].tool.driver.rules.map(rule => rule.id)).toEqual([
+      'architecture/dependency',
+      'architecture/companion-change',
+      'architecture/unmapped-file',
+      'architecture/overlapping-layers'
+    ]);
     expect(sarif.runs[0].tool.driver.rules[0].properties.tags).toEqual(['architecture', 'dependency']);
     expect(sarif.runs[0].results[0]).toMatchObject({
       ruleId: 'architecture/dependency',
@@ -125,6 +148,9 @@ layers:
     const summary = fs.readFileSync(summaryPath, 'utf8');
     expect(summary).toContain('## ArchGuard');
     expect(summary).toContain('Changed files: 1');
+    expect(summary).toContain('## Architecture impact');
+    expect(summary).toContain('| ui | domain | src/ui/App.ts |');
+    expect(summary).toContain('### Configuration coverage');
     expect(summary).toContain('ui → domain');
     expect(summary).toContain('architecture/dependency');
   });
