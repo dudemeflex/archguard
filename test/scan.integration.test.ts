@@ -416,6 +416,9 @@ layers:
     expect(help.stdout).toContain('default: HEAD');
     expect(help.stdout).toContain('pretty');
     expect(help.stdout).toContain('json');
+    expect(help.stdout).toContain('github');
+    expect(help.stdout).toContain('sarif');
+    expect(help.stdout).toContain('--output');
   });
 
   it('executes the built CLI for pretty and JSON architecture violations', () => {

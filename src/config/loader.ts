@@ -4,8 +4,8 @@ import yaml from 'js-yaml';
 import { ConfigSchema, ArchguardConfig } from './schema';
 import { ZodError } from 'zod';
 
-export function loadConfig(cwd = process.cwd()): ArchguardConfig | null {
-  const target = path.resolve(cwd, '.archguard.yml');
+export function loadConfig(cwd = process.cwd(), configPath = '.archguard.yml'): ArchguardConfig | null {
+  const target = path.resolve(cwd, configPath);
   if (!fs.existsSync(target)) return null;
 
   let raw: string;
@@ -21,7 +21,7 @@ export function loadConfig(cwd = process.cwd()): ArchguardConfig | null {
     parsed = yaml.load(raw);
   } catch (err) {
     const msg = err && (err as Error).message ? (err as Error).message : String(err);
-    throw new Error(`Invalid YAML in .archguard.yml: ${msg}`);
+    throw new Error(`Invalid YAML in ${configPath}: ${msg}`);
   }
 
   if (parsed === undefined || parsed === null) {

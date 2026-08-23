@@ -1,0 +1,23 @@
+name: ArchGuard
+description: Enforce repository architecture rules on changed JavaScript and TypeScript files
+author: ArchGuard contributors
+
+inputs:
+  base:
+    description: Base Git revision. Pull request base SHA is detected when omitted.
+    required: false
+  head:
+    description: Head Git revision. Pull request head SHA is detected when omitted.
+    required: false
+  config:
+    description: Repository-relative path to the ArchGuard configuration file
+    required: false
+    default: .archguard.yml
+
+runs:
+  using: node20
+  main: action-dist/index.js
+
+branding:
+  icon: shield
+  color: blue

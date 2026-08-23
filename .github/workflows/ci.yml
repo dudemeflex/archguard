@@ -23,5 +23,7 @@ jobs:
         run: npm test --silent
       - name: Build
         run: npm run build
+      - name: Build action bundle
+        run: npm run build:action
     permissions:
       contents: read

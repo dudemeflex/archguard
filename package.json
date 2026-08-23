@@ -3,19 +3,50 @@
   "version": "0.1.0",
   "description": "Deterministic CLI for Git change detection and architecture rule enforcement",
   "main": "dist/src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dudemeflex/archguard.git"
+  },
+  "homepage": "https://github.com/dudemeflex/archguard#readme",
+  "bugs": {
+    "url": "https://github.com/dudemeflex/archguard/issues"
+  },
   "bin": {
     "archguard": "dist/src/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:action": "ncc build src/action/index.ts -o action-dist --minify --transpile-only --no-source-map-register",
     "typecheck": "tsc --noEmit",
-    "pretest": "npm run build",
+    "pretest": "npm run build && npm run build:action",
     "test": "vitest --run",
     "lint": "eslint \"src/**/*.{ts,js}\" \"test/**/*.{ts,js}\" --max-warnings=0"
   },
-  "keywords": ["architecture", "scanner", "cli"],
+  "keywords": [
+    "architecture",
+    "dependency",
+    "github-actions",
+    "pull-request",
+    "typescript",
+    "javascript",
+    "static-analysis",
+    "ci",
+    "sarif",
+    "scanner",
+    "cli"
+  ],
   "author": "",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "action-dist",
+    "action.yml",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "js-yaml": "^4.1.0",
     "picomatch": "^2.3.2",
@@ -24,14 +55,16 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "vitest": "^1.4.3",
-    "ts-node": "^10.9.1",
-    "@types/node": "^20.5.6",
-    "@types/yargs": "^17.0.18",
     "@types/js-yaml": "^4.0.5",
+    "@types/node": "^20.5.6",
     "@types/picomatch": "^2.3.3",
-    "eslint": "^8.50.0",
+    "@types/yargs": "^17.0.18",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
     "@typescript-eslint/parser": "^6.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.10.0"
+    "@vercel/ncc": "^0.45.0",
+    "eslint": "^8.50.0",
+    "source-map-support": "^0.5.21",
+    "ts-node": "^10.9.1",
+    "vitest": "^1.4.3"
   }
 }
