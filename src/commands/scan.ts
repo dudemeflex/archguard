@@ -3,8 +3,10 @@ import { CommandModule } from 'yargs';
 import { loadConfig } from '../config/loader';
 import { GitAdapterImpl } from '../git/GitAdapter';
 import { TypeScriptDependencyAnalyzer } from '../dependencies/TypeScriptDependencyAnalyzer';
+import { ArchitectureRuleEvaluator } from '../rules/ArchitectureRuleEvaluator';
 import { TerminalReporter } from '../reporters';
 import { JsonReporter } from '../reporters/json';
+import type { Finding } from '../finding';
 import type { DependencyGraph, ScanResult } from '../types';
 
 const SUPPORTED_SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs']);
@@ -46,16 +48,31 @@ export async function performScan(opts: { base: string; head?: string; format?: 
 
   let dependencyGraph: DependencyGraph = {};
   try {
-      const repoRoot = await git.getRepositoryRoot();
-      const analyzer = new TypeScriptDependencyAnalyzer({ repoRoot, gitAdapter: git });
-      dependencyGraph = await analyzer.analyze(relevantFiles, head);
+    const repoRoot = await git.getRepositoryRoot();
+    const analyzer = new TypeScriptDependencyAnalyzer({ repoRoot, gitAdapter: git });
+    dependencyGraph = await analyzer.analyze(relevantFiles, head);
   } catch (err) {
     return { exitCode: 2, error: (err as Error).message };
   }
 
+  let findings: Finding[];
+  try {
+    const evaluator = new ArchitectureRuleEvaluator();
+    findings = await evaluator.evaluate(dependencyGraph, cfg);
+  } catch (err) {
+    return { exitCode: 2, error: (err as Error).message };
+  }
+
+  const summary = { errors: 0, warnings: 0, info: 0 };
+  for (const finding of findings) {
+    if (finding.severity === 'error') summary.errors++;
+    else if (finding.severity === 'warning') summary.warnings++;
+    else summary.info++;
+  }
+
   const result: ScanResult = {
     comparison: { base, head },
-    findings: [],
+    findings,
     changes,
     dependencyGraph,
     stats: {
@@ -63,11 +80,7 @@ export async function performScan(opts: { base: string; head?: string; format?: 
       filesAnalyzed: Object.keys(dependencyGraph).length,
       edgesAnalyzed: Object.values(dependencyGraph).reduce((sum, edges) => sum + edges.length, 0)
     },
-    summary: {
-      errors: 0,
-      warnings: 0,
-      info: 0
-    }
+    summary
   };
 
   try {
@@ -82,7 +95,7 @@ export async function performScan(opts: { base: string; head?: string; format?: 
     return { exitCode: 2, error: (err as Error).message };
   }
 
-  return { result, exitCode: 0 };
+  return { result, exitCode: summary.errors > 0 ? 1 : 0 };
 }
 
 export const scanCommand: CommandModule = {

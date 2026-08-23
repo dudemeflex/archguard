@@ -17,7 +17,7 @@ export class JsonReporter implements Reporter {
       dependencyGraph: result.dependencyGraph || {},
       findings,
       stats: result.stats || {},
-      summary: result.summary || summary
+      summary
     } as const;
 
     console.log(JSON.stringify(output, null, 2));

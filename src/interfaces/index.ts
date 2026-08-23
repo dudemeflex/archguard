@@ -3,6 +3,7 @@
  */
 
 import type { DependencyGraph, ScanResult, RepositoryChange } from '../types';
+import type { Finding } from '../finding';
 import type { ArchguardConfig } from '../config/schema';
 
 export interface GitAdapter {
@@ -24,7 +25,7 @@ export interface ArchitectureGraph {
 }
 
 export interface RuleEvaluator {
-  evaluate(graph: DependencyGraph, cfg: ArchguardConfig): Promise<ScanResult>;
+  evaluate(graph: DependencyGraph, cfg: ArchguardConfig): Promise<Finding[]>;
 }
 
 export interface Reporter {

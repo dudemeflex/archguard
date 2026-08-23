@@ -59,6 +59,12 @@ describe('config loader', () => {
     expect(cfg!.version).toBe(1);
   });
 
+  it('accepts an empty mayDependOn list', () => {
+    setup(`version: 1\nlayers:\n  - name: domain\n    matches:\n      - "src/domain/**"\n    mayDependOn: []\n`);
+    const cfg = loadConfig(tmpDir);
+    expect(cfg!.layers[0].mayDependOn).toEqual([]);
+  });
+
   it('fails when mayDependOn references unknown layer', () => {
     setup(`version: 1\nlayers:\n  - name: domain\n    matches:\n      - "src/domain/**"\n    mayDependOn:\n      - infrastructure\n`);
     expect(() => loadConfig(tmpDir)).toThrow(/mayDependOn references unknown layer/);

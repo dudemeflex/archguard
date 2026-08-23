@@ -52,16 +52,32 @@ export class TerminalReporter implements ReporterInterface {
     console.log(`  ${edgesAnalyzed} local dependency edges`);
     console.log('');
 
+    console.log('Architecture rules:');
+
     if (findings.length > 0) {
+      console.log('');
       for (const f of findings) {
         const header = `${(f.severity || 'info').toUpperCase()} ${f.ruleId || ''}`.trim();
         console.log(header);
         if (f.file) {
           console.log(`${f.file}${f.line ? `:${f.line}` : ''}`);
         }
-        console.log(f.title || f.message);
-        if (f.evidence) console.log(`Evidence: ${f.evidence}`);
-        if (f.suggestion) console.log(`Suggestion: ${f.suggestion}`);
+        console.log('');
+        if (f.title) {
+          console.log(f.title);
+          console.log('');
+        }
+        console.log(f.message);
+        if (f.evidence) {
+          console.log('');
+          console.log('Evidence:');
+          console.log(`  ${f.evidence}`);
+        }
+        if (f.suggestion) {
+          console.log('');
+          console.log('Suggestion:');
+          console.log(`  ${f.suggestion}`);
+        }
         console.log('');
       }
 
@@ -69,6 +85,6 @@ export class TerminalReporter implements ReporterInterface {
       return;
     }
 
-    console.log('Architecture rule evaluation is not implemented yet.');
+    console.log('  No violations found.');
   }
 }
