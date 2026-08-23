@@ -21,6 +21,9 @@ export class TerminalReporter implements ReporterInterface {
     const findings = result.findings || [];
     const changes = result.changes || [];
     const comparison = result.comparison ?? { base: 'unknown', head: 'HEAD' };
+    const graph = result.dependencyGraph || {};
+    const filesAnalyzed = Object.keys(graph).length;
+    const edgesAnalyzed = Object.values(graph).reduce((sum, edges) => sum + edges.length, 0);
 
     console.log('ArchGuard');
     console.log('');
@@ -44,6 +47,11 @@ export class TerminalReporter implements ReporterInterface {
     console.log(`${changes.length} changed files`);
     console.log('');
 
+    console.log('Dependency analysis:');
+    console.log(`  ${filesAnalyzed} source files analyzed`);
+    console.log(`  ${edgesAnalyzed} local dependency edges`);
+    console.log('');
+
     if (findings.length > 0) {
       for (const f of findings) {
         const header = `${(f.severity || 'info').toUpperCase()} ${f.ruleId || ''}`.trim();
@@ -61,6 +69,6 @@ export class TerminalReporter implements ReporterInterface {
       return;
     }
 
-    console.log('Architecture analysis is not implemented yet.');
+    console.log('Architecture rule evaluation is not implemented yet.');
   }
 }

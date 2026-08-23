@@ -12,8 +12,15 @@ function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
+interface RevisionTreeEntry {
+  mode: string;
+  type: string;
+  size: number | null;
+}
+
 export class GitAdapterImpl implements GitAdapter {
   private repoRoot: string | null = null;
+  private readonly resolvedCommitCache = new Map<string, string>();
 
   constructor(private readonly cwd: string = process.cwd()) {}
 
@@ -53,10 +60,20 @@ export class GitAdapterImpl implements GitAdapter {
   }
 
   private async resolveCommit(ref: string): Promise<string> {
+    const cacheKey = ref;
+    const cached = this.resolvedCommitCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const repoRoot = await this.ensureGitRepo();
     try {
       const { stdout } = await this.runGit(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`], repoRoot);
-      return stdout.trim();
+      const sha = stdout.trim();
+      if (sha) {
+        this.resolvedCommitCache.set(cacheKey, sha);
+      }
+      return sha;
     } catch {
       throw new InvalidGitRef(ref);
     }
@@ -64,6 +81,61 @@ export class GitAdapterImpl implements GitAdapter {
 
   private async verifyRef(ref: string): Promise<string> {
     return this.resolveCommit(ref);
+  }
+
+  public async getRepositoryRoot(): Promise<string> {
+    return this.ensureGitRepo();
+  }
+
+  private async getRevisionTreeEntry(filePath: string, rev: string): Promise<RevisionTreeEntry | null> {
+    const repoRoot = await this.ensureGitRepo();
+    const safePath = this.normalizeRepoRelativePath(filePath);
+    const sha = await this.resolveCommit(rev);
+    const literalPathspec = `:(literal)${safePath}`;
+    const { stdout } = await this.runGit(['ls-tree', '-l', '-z', sha, '--', literalPathspec], repoRoot);
+    if (!stdout) return null;
+
+    const entry = stdout.split('\0', 1)[0];
+    const separator = entry.indexOf('\t');
+    if (separator === -1 || normalizePath(entry.slice(separator + 1)) !== safePath) {
+      throw new GitCommandFailure(`Malformed git ls-tree output for path: ${safePath}`);
+    }
+
+    const fields = entry.slice(0, separator).trim().split(/\s+/);
+    if (fields.length !== 4) {
+      throw new GitCommandFailure(`Malformed git ls-tree metadata for path: ${safePath}`);
+    }
+
+    const [mode, type, , sizeText] = fields;
+    let size: number | null = null;
+    if (sizeText !== '-') {
+      size = Number.parseInt(sizeText, 10);
+      if (!Number.isSafeInteger(size) || size < 0) {
+        throw new GitCommandFailure(`Invalid git object size for path: ${safePath}`);
+      }
+    }
+
+    return { mode, type, size };
+  }
+
+  public async fileExistsAtRevision(filePath: string, rev: string): Promise<boolean> {
+    const entry = await this.getRevisionTreeEntry(filePath, rev);
+    return entry?.type === 'blob';
+  }
+
+  public async getFileSizeAtRevision(filePath: string, rev: string): Promise<number | null> {
+    const entry = await this.getRevisionTreeEntry(filePath, rev);
+    return entry?.type === 'blob' ? entry.size : null;
+  }
+
+  public async isSymlinkAtRevision(filePath: string, rev: string): Promise<boolean> {
+    const entry = await this.getRevisionTreeEntry(filePath, rev);
+    return entry?.mode === '120000';
+  }
+
+  private escapesRoot(relativePath: string): boolean {
+    const normalized = relativePath.replace(/\\/g, '/');
+    return normalized === '..' || normalized.startsWith('../') || path.isAbsolute(relativePath) || normalized.startsWith('/');
   }
 
   private normalizeRepoRelativePath(filePath: string): string {
@@ -75,8 +147,8 @@ export class GitAdapterImpl implements GitAdapter {
     if (
       normalized === '' ||
       normalized === '.' ||
-      normalized.startsWith('/') ||
-      normalized.startsWith('\\') ||
+      this.escapesRoot(normalized) ||
+      path.posix.isAbsolute(normalized) ||
       /^[A-Za-z]:/.test(normalized) ||
       normalized.includes('\0')
     ) {
@@ -89,7 +161,7 @@ export class GitAdapterImpl implements GitAdapter {
     }
 
     const posix = path.posix.normalize(normalized);
-    if (posix === '.' || posix === '..' || posix.startsWith('../') || path.posix.isAbsolute(posix)) {
+    if (posix === '.' || posix === '..' || this.escapesRoot(posix) || path.posix.isAbsolute(posix)) {
       throw new GitCommandFailure(`Invalid repository-relative file path: ${filePath}`);
     }
 
@@ -99,8 +171,8 @@ export class GitAdapterImpl implements GitAdapter {
   private resolveRepoPath(filePath: string, repoRoot: string): string {
     const safePath = this.normalizeRepoRelativePath(filePath);
     const abs = path.resolve(repoRoot, safePath);
-    const relativeToRoot = path.relative(repoRoot, abs);
-    if (relativeToRoot === '' || relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
+    const relativeToRoot = path.relative(repoRoot, abs).replace(/\\/g, '/');
+    if (relativeToRoot === '' || this.escapesRoot(relativeToRoot) || path.isAbsolute(relativeToRoot)) {
       throw new GitCommandFailure(`File path escapes repository root: ${filePath}`);
     }
     return abs;
@@ -186,8 +258,8 @@ export class GitAdapterImpl implements GitAdapter {
       }
 
       const realPath = fs.realpathSync(abs);
-      const realRelative = path.relative(repoRoot, realPath);
-      if (realRelative.startsWith('..') || path.isAbsolute(realRelative)) {
+      const realRelative = path.relative(repoRoot, realPath).replace(/\\/g, '/');
+      if (this.escapesRoot(realRelative) || path.isAbsolute(realRelative)) {
         throw new GitCommandFailure(`File escapes repository root: ${filePath}`);
       }
 

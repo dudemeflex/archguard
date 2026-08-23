@@ -36,8 +36,15 @@ export interface ScanResult {
   };
   findings: Finding[];
   changes?: RepositoryChange[];
+  dependencyGraph?: DependencyGraph;
   stats?: {
+    changedFiles?: number;
     filesAnalyzed?: number;
     edgesAnalyzed?: number;
+  };
+  summary?: {
+    errors?: number;
+    warnings?: number;
+    info?: number;
   };
 }

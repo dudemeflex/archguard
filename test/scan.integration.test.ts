@@ -102,9 +102,11 @@ describe('scan integration', () => {
     expect(res.exitCode).toBe(0);
     expect(res.result!.changes).toEqual([]);
     expect(res.result!.comparison).toEqual({ base, head: base });
+    expect(res.result!.dependencyGraph).toEqual({});
+    expect(res.result!.stats).toEqual({ changedFiles: 0, filesAnalyzed: 0, edgesAnalyzed: 0 });
     expect(out.join('\n')).toContain('No changes detected.');
     expect(out.join('\n')).toContain('0 changed files');
-    expect(out.join('\n')).toContain('Architecture analysis is not implemented yet.');
+    expect(out.join('\n')).toContain('Architecture rule evaluation is not implemented yet.');
   });
 
   it('json output is parseable and contains the expected comparison and changes', async () => {
@@ -136,28 +138,163 @@ describe('scan integration', () => {
     expect(parsed.changes.some((item: { path: string }) => item.path === 'b.txt')).toBe(true);
   });
 
-  it('executes the built CLI smoke tests', () => {
+  it('performs dependency analysis in scan output', async () => {
+    initRepo(tmp);
+    fs.writeFileSync(path.join(tmp, '.archguard.yml'), sampleConfig, 'utf8');
+    fs.mkdirSync(path.join(tmp, 'src', 'domain'), { recursive: true });
+    fs.mkdirSync(path.join(tmp, 'src', 'application'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'src', 'domain', 'user.ts'), 'export type User = { id: string };\n');
+    fs.writeFileSync(path.join(tmp, 'src', 'application', 'service.ts'), "import { User } from '../domain/user';\n");
+    runGit(tmp, ['add', '.']);
+    runGit(tmp, ['commit', '-m', 'seed service']);
+    const base = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    fs.writeFileSync(path.join(tmp, 'src', 'application', 'service.ts'), "import { User } from '../domain/user';\nexport const value = 1;\n");
+    runGit(tmp, ['add', '.']);
+    runGit(tmp, ['commit', '-m', 'modify service']);
+    const head = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    const res = await performScan({ base, head, cwd: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(res.result).toBeDefined();
+    expect(res.result!.dependencyGraph).toBeDefined();
+    expect(res.result!.dependencyGraph!['src/application/service.ts']).toContainEqual({
+      source: 'src/application/service.ts',
+      target: 'src/domain/user.ts',
+      specifier: '../domain/user',
+      line: 1
+    });
+  });
+
+  it('returns exitCode 2 when a changed source exceeds the analysis size limit', async () => {
+    initRepo(tmp);
+    fs.writeFileSync(path.join(tmp, '.archguard.yml'), sampleConfig, 'utf8');
+    fs.mkdirSync(path.join(tmp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'src', 'huge.ts'), 'export const value = 1;\n');
+    runGit(tmp, ['add', '.']);
+    runGit(tmp, ['commit', '-m', 'add small source']);
+    const base = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    fs.writeFileSync(path.join(tmp, 'src', 'huge.ts'), 'x'.repeat(5 * 1024 * 1024 + 128));
+    runGit(tmp, ['add', '.']);
+    runGit(tmp, ['commit', '-m', 'oversize source']);
+    const head = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    const res = await performScan({ base, head, cwd: tmp });
+    expect(res.exitCode).toBe(2);
+    expect(res.error).toMatch(/Source file exceeds dependency-analysis size limit/);
+  });
+
+  it('reports deleted sources without analyzing them', async () => {
+    initRepo(tmp);
+    fs.writeFileSync(path.join(tmp, '.archguard.yml'), sampleConfig, 'utf8');
+    fs.mkdirSync(path.join(tmp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'src', 'deleted.ts'), 'export const deleted = true;\n');
+    runGit(tmp, ['add', '.']);
+    runGit(tmp, ['commit', '-m', 'add source']);
+    const base = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    fs.unlinkSync(path.join(tmp, 'src', 'deleted.ts'));
+    runGit(tmp, ['add', '-A']);
+    runGit(tmp, ['commit', '-m', 'delete source']);
+    const head = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    const res = await performScan({ base, head, cwd: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(res.result!.changes).toContainEqual({ type: 'deleted', path: 'src/deleted.ts' });
+    expect(res.result!.dependencyGraph).not.toHaveProperty('src/deleted.ts');
+    expect(res.result!.stats!.filesAnalyzed).toBe(0);
+  });
+
+  it('analyzes the new path of a renamed source', async () => {
+    initRepo(tmp);
+    fs.writeFileSync(path.join(tmp, '.archguard.yml'), sampleConfig, 'utf8');
+    fs.mkdirSync(path.join(tmp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'src', 'dep.ts'), 'export const dep = true;\n');
+    fs.writeFileSync(path.join(tmp, 'src', 'old.ts'), "import './dep';\n");
+    runGit(tmp, ['add', '.']);
+    runGit(tmp, ['commit', '-m', 'add old source']);
+    const base = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    runGit(tmp, ['mv', 'src/old.ts', 'src/new.ts']);
+    runGit(tmp, ['commit', '-m', 'rename source']);
+    const head = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    const res = await performScan({ base, head, cwd: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(res.result!.changes).toContainEqual({ type: 'renamed', oldPath: 'src/old.ts', path: 'src/new.ts' });
+    expect(res.result!.dependencyGraph).not.toHaveProperty('src/old.ts');
+    expect(res.result!.dependencyGraph!['src/new.ts']).toEqual([
+      { source: 'src/new.ts', target: 'src/dep.ts', specifier: './dep', line: 1 }
+    ]);
+  });
+
+  it('counts all changes but analyzes only changed source files and emitted edges', async () => {
+    initRepo(tmp);
+    fs.writeFileSync(path.join(tmp, '.archguard.yml'), sampleConfig, 'utf8');
+    fs.mkdirSync(path.join(tmp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'README.md'), 'before\n');
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"private":true}\n');
+    fs.writeFileSync(path.join(tmp, 'image.png'), Buffer.from([0, 1, 2]));
+    fs.writeFileSync(path.join(tmp, 'src', 'one.ts'), 'export const one = true;\n');
+    fs.writeFileSync(path.join(tmp, 'src', 'two.ts'), 'export const two = true;\n');
+    fs.writeFileSync(path.join(tmp, 'src', 'a.ts'), "import './one';\nimport './two';\n");
+    runGit(tmp, ['add', '.']);
+    runGit(tmp, ['commit', '-m', 'seed mixed files']);
+    const base = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    fs.writeFileSync(path.join(tmp, 'README.md'), 'after\n');
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"private":false}\n');
+    fs.writeFileSync(path.join(tmp, 'image.png'), Buffer.from([3, 4, 5]));
+    fs.appendFileSync(path.join(tmp, 'src', 'a.ts'), 'export const version = 2;\n');
+    runGit(tmp, ['add', '.']);
+    runGit(tmp, ['commit', '-m', 'change mixed files']);
+    const head = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    const res = await performScan({ base, head, cwd: tmp });
+    expect(res.exitCode).toBe(0);
+    expect(res.result!.changes).toHaveLength(4);
+    expect(res.result!.stats).toEqual({ changedFiles: 4, filesAnalyzed: 1, edgesAnalyzed: 2 });
+    expect(res.result!.dependencyGraph!['src/a.ts']).toHaveLength(2);
+  });
+
+  it('executes the built CLI against a real dependency edge', () => {
     const cliPath = path.resolve(__dirname, '../dist/src/index.js');
     expect(fs.existsSync(cliPath)).toBe(true);
 
     initRepo(tmp);
     fs.writeFileSync(path.join(tmp, '.archguard.yml'), sampleConfig, 'utf8');
-    fs.writeFileSync(path.join(tmp, 'a.txt'), '1');
+    fs.mkdirSync(path.join(tmp, 'src', 'domain'), { recursive: true });
+    fs.mkdirSync(path.join(tmp, 'src', 'application'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'src', 'domain', 'user.ts'), 'export type User = {\n  id: string;\n};\n');
+    fs.writeFileSync(path.join(tmp, 'src', 'application', 'service.ts'), [
+      "import type { User } from '../domain/user';",
+      '',
+      'export function useUser(user: User) {',
+      '  return user.id;',
+      '}',
+      ''
+    ].join('\n'));
     runGit(tmp, ['add', '.']);
-    runGit(tmp, ['commit', '-m', 'initial']);
+    runGit(tmp, ['commit', '-m', 'seed dependency graph']);
     const base = runGit(tmp, ['rev-parse', 'HEAD']);
-    fs.writeFileSync(path.join(tmp, 'a.txt'), '2');
-    runGit(tmp, ['add', '.']);
-    runGit(tmp, ['commit', '-m', 'modify']);
 
-    const valid = spawnSync(process.execPath, [cliPath, 'scan', '--base', base, '--head', 'HEAD'], { cwd: tmp, encoding: 'utf8' });
+    fs.appendFileSync(path.join(tmp, 'src', 'application', 'service.ts'), 'export const version = 2;\n');
+    runGit(tmp, ['add', '.']);
+    runGit(tmp, ['commit', '-m', 'modify service']);
+    const head = runGit(tmp, ['rev-parse', 'HEAD']);
+
+    const valid = spawnSync(process.execPath, [cliPath, 'scan', '--base', base, '--head', head], { cwd: tmp, encoding: 'utf8' });
     expect(valid.status).toBe(0);
     expect(valid.stderr).toBe('');
     expect(valid.stdout).toContain('ArchGuard');
     expect(valid.stdout).toContain('Comparing:');
     expect(valid.stdout).toContain(base);
-    expect(valid.stdout).toContain('HEAD');
-    expect(valid.stdout).toContain('a.txt');
+    expect(valid.stdout).toContain(head);
+    expect(valid.stdout).toContain('src/application/service.ts');
+    expect(valid.stdout).toContain('Dependency analysis:');
+    expect(valid.stdout).toContain('  1 source files analyzed');
+    expect(valid.stdout).toContain('  1 local dependency edges');
 
     const missing = spawnSync(process.execPath, [cliPath, 'scan'], { cwd: tmp, encoding: 'utf8' });
     expect(missing.status).toBe(2);
@@ -168,15 +305,23 @@ describe('scan integration', () => {
     const invalidHead = spawnSync(process.execPath, [cliPath, 'scan', '--base', base, '--head', 'does-not-exist'], { cwd: tmp, encoding: 'utf8' });
     expect(invalidHead.status).toBe(2);
 
-    const json = spawnSync(process.execPath, [cliPath, 'scan', '--base', base, '--head', 'HEAD', '--format', 'json'], { cwd: tmp, encoding: 'utf8' });
+    const json = spawnSync(process.execPath, [cliPath, 'scan', '--base', base, '--head', head, '--format', 'json'], { cwd: tmp, encoding: 'utf8' });
     expect(json.status).toBe(0);
     expect(json.stderr).toBe('');
     const parsed = JSON.parse(json.stdout);
     expect(parsed.comparison.base).toBe(base);
-    expect(parsed.comparison.head).toBe('HEAD');
+    expect(parsed.comparison.head).toBe(head);
     expect(Array.isArray(parsed.changes)).toBe(true);
     expect(Array.isArray(parsed.findings)).toBe(true);
-    expect(parsed.changes.some((item: { path: string }) => item.path === 'a.txt')).toBe(true);
+    expect(parsed.changes.some((item: { path: string }) => item.path === 'src/application/service.ts')).toBe(true);
+    expect(parsed.dependencyGraph['src/application/service.ts']).toEqual([
+      {
+        source: 'src/application/service.ts',
+        target: 'src/domain/user.ts',
+        specifier: '../domain/user',
+        line: 1
+      }
+    ]);
 
     const noChangeJson = spawnSync(process.execPath, [cliPath, 'scan', '--base', 'HEAD', '--head', 'HEAD', '--format', 'json'], { cwd: tmp, encoding: 'utf8' });
     expect(noChangeJson.status).toBe(0);
@@ -186,6 +331,8 @@ describe('scan integration', () => {
     expect(noChangeParsed.findings).toEqual([]);
     expect(noChangeParsed.comparison.base).toBe('HEAD');
     expect(noChangeParsed.comparison.head).toBe('HEAD');
+    expect(noChangeParsed.dependencyGraph).toEqual({});
+    expect(noChangeParsed.stats).toEqual({ changedFiles: 0, filesAnalyzed: 0, edgesAnalyzed: 0 });
 
     const help = spawnSync(process.execPath, [cliPath, 'scan', '--help'], { cwd: tmp, encoding: 'utf8' });
     expect(help.status).toBe(0);

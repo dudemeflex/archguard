@@ -14,9 +14,10 @@ export class JsonReporter implements Reporter {
     const output = {
       comparison: result.comparison ?? { base: 'unknown', head: 'HEAD' },
       changes: result.changes || [],
+      dependencyGraph: result.dependencyGraph || {},
       findings,
       stats: result.stats || {},
-      summary
+      summary: result.summary || summary
     } as const;
 
     console.log(JSON.stringify(output, null, 2));

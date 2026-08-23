@@ -1,9 +1,10 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { loadConfig } from '../src/config/loader';
 
-const tmpDir = path.resolve(__dirname, 'tmp-config');
+let tmpDir: string;
 
 function setup(contents: string) {
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
@@ -19,6 +20,10 @@ function cleanup() {
 }
 
 describe('config loader', () => {
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'archguard-config-'));
+  });
+
   afterEach(() => cleanup());
 
   it('returns null when config missing', () => {

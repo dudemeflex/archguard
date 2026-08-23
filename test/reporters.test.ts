@@ -10,7 +10,7 @@ describe('reporters', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     await r.report({ findings: [] });
     expect(spy).toHaveBeenCalledWith('Comparing:');
-    expect(spy).toHaveBeenCalledWith('Architecture analysis is not implemented yet.');
+    expect(spy).toHaveBeenCalledWith('Architecture rule evaluation is not implemented yet.');
     spy.mockRestore();
   });
 

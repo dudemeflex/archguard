@@ -1,9 +1,17 @@
+import path from 'path';
 import { CommandModule } from 'yargs';
 import { loadConfig } from '../config/loader';
 import { GitAdapterImpl } from '../git/GitAdapter';
+import { TypeScriptDependencyAnalyzer } from '../dependencies/TypeScriptDependencyAnalyzer';
 import { TerminalReporter } from '../reporters';
 import { JsonReporter } from '../reporters/json';
-import type { ScanResult } from '../types';
+import type { DependencyGraph, ScanResult } from '../types';
+
+const SUPPORTED_SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs']);
+
+function isSupportedSourcePath(filePath: string): boolean {
+  return SUPPORTED_SOURCE_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+}
 
 export async function performScan(opts: { base: string; head?: string; format?: 'pretty' | 'json'; cwd?: string }): Promise<{ result?: ScanResult; exitCode: number; error?: string }> {
   const cwd = opts.cwd || process.cwd();
@@ -13,7 +21,6 @@ export async function performScan(opts: { base: string; head?: string; format?: 
 
   if (!base) return { exitCode: 2, error: 'Missing required --base argument' };
 
-  // Load config and validate
   let cfg;
   try {
     cfg = loadConfig(cwd);
@@ -32,11 +39,35 @@ export async function performScan(opts: { base: string; head?: string; format?: 
     return { exitCode: 2, error: (err as Error).message };
   }
 
+  const relevantFiles = changes
+    .filter(change => change.type !== 'deleted')
+    .map(change => change.path)
+    .filter(filePath => isSupportedSourcePath(filePath));
+
+  let dependencyGraph: DependencyGraph = {};
+  try {
+      const repoRoot = await git.getRepositoryRoot();
+      const analyzer = new TypeScriptDependencyAnalyzer({ repoRoot, gitAdapter: git });
+      dependencyGraph = await analyzer.analyze(relevantFiles, head);
+  } catch (err) {
+    return { exitCode: 2, error: (err as Error).message };
+  }
+
   const result: ScanResult = {
     comparison: { base, head },
     findings: [],
     changes,
-    stats: { filesAnalyzed: changes.length }
+    dependencyGraph,
+    stats: {
+      changedFiles: changes.length,
+      filesAnalyzed: Object.keys(dependencyGraph).length,
+      edgesAnalyzed: Object.values(dependencyGraph).reduce((sum, edges) => sum + edges.length, 0)
+    },
+    summary: {
+      errors: 0,
+      warnings: 0,
+      info: 0
+    }
   };
 
   try {
