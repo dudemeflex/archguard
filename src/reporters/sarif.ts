@@ -1,6 +1,7 @@
 import type { Finding, Severity } from '../finding';
 import type { Reporter } from '../interfaces';
 import type { ScanResult } from '../types';
+import { activeFindings } from '../findings/summary';
 
 const RULE_METADATA: Record<string, {
   name: string;
@@ -81,12 +82,19 @@ function sarifResult(finding: Finding) {
     ruleId: finding.ruleId || 'archguard/finding',
     level: sarifLevel(finding.severity),
     message: { text: finding.message },
-    ...(location ? { locations: [location] } : {})
+    ...(location ? { locations: [location] } : {}),
+    ...(finding.fingerprint
+      ? { partialFingerprints: { 'archguardFingerprint/v1': finding.fingerprint } }
+      : {})
   };
 }
 
-export function createSarifLog(result: ScanResult) {
-  const findings = result.findings || [];
+export function createSarifLog(
+  result: Pick<ScanResult, 'findings'>,
+  options: { includeBaseline?: boolean } = {}
+) {
+  const allFindings = result.findings || [];
+  const findings = options.includeBaseline ? allFindings : activeFindings(allFindings);
   const rules = new Map<string, ReturnType<typeof ruleDefinition>>();
   for (const finding of findings) {
     const id = finding.ruleId || 'archguard/finding';
@@ -109,7 +117,7 @@ export function createSarifLog(result: ScanResult) {
   } as const;
 }
 
-export function renderSarif(result: ScanResult): string {
+export function renderSarif(result: Pick<ScanResult, 'findings'>): string {
   return JSON.stringify(createSarifLog(result), null, 2);
 }
 

@@ -3,27 +3,10 @@ import type { ArchitectureGraph, RuleEvaluator } from '../interfaces';
 import type { Finding } from '../finding';
 import type { DependencyEdge, DependencyGraph } from '../types';
 import { ArchitectureGraphImpl } from '../architecture/ArchitectureGraph';
+import { dependencyFindingFingerprint } from '../findings/fingerprint';
+import { evaluateLayerDependency } from './architecturePolicy';
 
 const ARCHITECTURE_DEPENDENCY_RULE_ID = 'architecture/dependency';
-
-function pairKey(sourceLayer: string, targetLayer: string): string {
-  return JSON.stringify([sourceLayer, targetLayer]);
-}
-
-function evidenceKey(
-  edge: DependencyEdge,
-  sourceLayer: string,
-  targetLayer: string
-): string {
-  return JSON.stringify([
-    edge.source,
-    edge.target,
-    sourceLayer,
-    targetLayer,
-    edge.specifier ?? null,
-    edge.line ?? null
-  ]);
-}
 
 function formatEvidence(edge: DependencyEdge): string {
   const via = edge.specifier ? ` via "${edge.specifier}"` : '';
@@ -35,14 +18,6 @@ export class ArchitectureRuleEvaluator implements RuleEvaluator {
 
   async evaluate(graph: DependencyGraph, config: ArchguardConfig): Promise<Finding[]> {
     const architecture = this.architecture ?? new ArchitectureGraphImpl(config);
-    const allowedDependencies = new Map(
-      config.layers.map(layer => [layer.name, new Set(layer.mayDependOn ?? [])])
-    );
-    const explicitRules = new Map<string, boolean>();
-    for (const rule of config.rules) {
-      explicitRules.set(pairKey(rule.from, rule.to), rule.allow);
-    }
-
     const findings: Finding[] = [];
     const seen = new Set<string>();
 
@@ -54,11 +29,18 @@ export class ArchitectureRuleEvaluator implements RuleEvaluator {
 
         for (const sourceLayer of sourceLayers) {
           for (const targetLayer of targetLayers) {
-            if (this.isAllowed(sourceLayer, targetLayer, allowedDependencies, explicitRules)) continue;
+            if (evaluateLayerDependency(config, sourceLayer, targetLayer).allowed) continue;
 
-            const key = evidenceKey(edge, sourceLayer, targetLayer);
-            if (seen.has(key)) continue;
-            seen.add(key);
+            const fingerprint = dependencyFindingFingerprint({
+              ruleId: ARCHITECTURE_DEPENDENCY_RULE_ID,
+              source: edge.source,
+              target: edge.target,
+              sourceLayer,
+              targetLayer,
+              specifier: edge.specifier
+            });
+            if (seen.has(fingerprint)) continue;
+            seen.add(fingerprint);
 
             findings.push({
               ruleId: ARCHITECTURE_DEPENDENCY_RULE_ID,
@@ -69,6 +51,7 @@ export class ArchitectureRuleEvaluator implements RuleEvaluator {
               ...(edge.line === undefined ? {} : { line: edge.line }),
               sourceLayer,
               targetLayer,
+              fingerprint,
               evidence: formatEvidence(edge),
               suggestion: 'Depend on an allowed layer or update .archguard.yml.'
             });
@@ -78,19 +61,5 @@ export class ArchitectureRuleEvaluator implements RuleEvaluator {
     }
 
     return findings;
-  }
-
-  private isAllowed(
-    sourceLayer: string,
-    targetLayer: string,
-    allowedDependencies: Map<string, Set<string>>,
-    explicitRules: Map<string, boolean>
-  ): boolean {
-    const explicitRule = pairKey(sourceLayer, targetLayer);
-    if (explicitRules.has(explicitRule)) {
-      return explicitRules.get(explicitRule) === true;
-    }
-    if (sourceLayer === targetLayer) return true;
-    return allowedDependencies.get(sourceLayer)?.has(targetLayer) === true;
   }
 }

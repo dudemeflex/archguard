@@ -70,6 +70,10 @@ export function loadConfig(cwd = process.cwd(), configPath = '.archguard.yml'): 
       }
     }
 
+    for (const pattern of cfg.audit?.exclude || []) {
+      validateGlob(pattern, 'audit exclude');
+    }
+
     // rules reference known layers
     for (const rule of cfg.rules || []) {
       if (!layerNames.includes(rule.from)) {

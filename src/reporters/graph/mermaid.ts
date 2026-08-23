@@ -1,4 +1,4 @@
-import type { ArchitecturePolicyGraph } from '../../graph/types';
+import type { RenderableArchitectureGraph } from '../../graph/types';
 
 function escapeMermaidLabel(value: string): string {
   return value
@@ -10,7 +10,7 @@ function escapeMermaidLabel(value: string): string {
     .replace(/\n/g, '&#10;');
 }
 
-export function renderMermaidGraph(graph: ArchitecturePolicyGraph): string {
+export function renderMermaidGraph(graph: RenderableArchitectureGraph): string {
   const nodeIds = new Map(graph.layers.map((layer, index) => [layer.name, `layer_${index}`]));
   const lines = ['flowchart LR'];
   for (const layer of graph.layers) {
@@ -18,7 +18,12 @@ export function renderMermaidGraph(graph: ArchitecturePolicyGraph): string {
   }
   if (graph.edges.length > 0) lines.push('');
   for (const edge of graph.edges) {
-    lines.push(`  ${nodeIds.get(edge.from)} --> ${nodeIds.get(edge.to)}`);
+    if ('count' in edge) {
+      const label = `${edge.count}${edge.allowed ? '' : ' forbidden'}`;
+      lines.push(`  ${nodeIds.get(edge.from)} -->|${label}| ${nodeIds.get(edge.to)}`);
+    } else {
+      lines.push(`  ${nodeIds.get(edge.from)} --> ${nodeIds.get(edge.to)}`);
+    }
   }
   return lines.join('\n');
 }

@@ -3,6 +3,7 @@ import type { Finding } from '../finding';
 import type { ArchitectureGraph } from '../interfaces';
 import type { RepositoryChange } from '../types';
 import { compileRepositoryGlob, normalizeRepositoryPath } from '../architecture/globs';
+import { companionFindingFingerprint } from '../findings/fingerprint';
 
 interface CompanionLayer {
   name: string;
@@ -48,6 +49,12 @@ export class CompanionChangeEvaluator {
         message: `Layer "${layer.name}" changed without a required companion change.`,
         file: trigger,
         sourceLayer: layer.name,
+        fingerprint: companionFindingFingerprint({
+          ruleId: 'architecture/companion-change',
+          layer: layer.name,
+          trigger,
+          patterns: layer.patterns
+        }),
         evidence: [
           `changed layer: ${layer.name}`,
           `trigger file: ${trigger}`,

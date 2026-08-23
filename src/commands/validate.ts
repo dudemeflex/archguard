@@ -1,5 +1,6 @@
 import type { CommandModule } from 'yargs';
 import { loadConfig } from '../config/loader';
+import { loadBaseline, resolveBaselineLocation } from '../baseline/store';
 
 export interface ValidateOptions {
   configPath?: string;
@@ -12,6 +13,7 @@ export function performValidate(opts: ValidateOptions = {}): { exitCode: number;
   try {
     const config = loadConfig(cwd, configPath);
     if (!config) return { exitCode: 2, error: `No ${configPath} found in current directory` };
+    loadBaseline(resolveBaselineLocation(cwd, config));
     return { exitCode: 0 };
   } catch (err) {
     return { exitCode: 2, error: (err as Error).message };

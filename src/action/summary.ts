@@ -2,6 +2,7 @@ import fs from 'fs';
 import type { Finding } from '../finding';
 import type { ScanResult } from '../types';
 import { emptyArchitectureImpact } from '../impact/empty';
+import { activeFindings } from '../findings/summary';
 
 const MAX_SUMMARY_FINDINGS = 50;
 const MAX_CELL_LENGTH = 500;
@@ -31,7 +32,9 @@ function layerDependency(finding: Finding): string {
 }
 
 export function renderStepSummary(result: ScanResult): string {
-  const findings = result.findings || [];
+  const allFindings = result.findings || [];
+  const findings = activeFindings(allFindings);
+  const baselineSuppressed = allFindings.length - findings.length;
   const summary = result.summary ?? { errors: 0, warnings: 0, info: 0 };
   const stats = result.stats ?? {};
   const impact = result.impact ?? emptyArchitectureImpact();
@@ -44,10 +47,19 @@ export function renderStepSummary(result: ScanResult): string {
     `- Changed files: ${stats.changedFiles ?? result.changes?.length ?? 0}`,
     `- Files analyzed: ${stats.filesAnalyzed ?? Object.keys(result.dependencyGraph ?? {}).length}`,
     `- Dependency edges: ${stats.edgesAnalyzed ?? 0}`,
-    `- Architecture violations: ${findings.length}`,
+    `- Architecture violations: ${allFindings.length}`,
     `- Severity: ${summary.errors ?? 0} error(s), ${summary.warnings ?? 0} warning(s), `
       + `${summary.info ?? 0} notice(s)`
   ];
+
+  lines.push(
+    '',
+    '### Architecture findings',
+    '',
+    `- New violations: ${findings.length}`,
+    `- Baseline violations: ${baselineSuppressed}`
+  );
+  if (findings.length === 0) lines.push('', 'No new architecture violations.');
 
   lines.push(
     '',

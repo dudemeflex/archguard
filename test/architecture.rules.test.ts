@@ -94,6 +94,7 @@ describe('ArchitectureRuleEvaluator', () => {
         line: 7,
         sourceLayer: 'ui',
         targetLayer: 'domain',
+        fingerprint: expect.any(String),
         evidence: 'src/ui/App.ts -> src/domain/user.ts via "../domain/user"',
         suggestion: 'Depend on an allowed layer or update .archguard.yml.'
       }

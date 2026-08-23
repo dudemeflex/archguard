@@ -13,6 +13,8 @@ export interface GitAdapter {
   getFileSizeAtRevision(filePath: string, rev: string): Promise<number | null>;
   isSymlinkAtRevision(filePath: string, rev: string): Promise<boolean>;
   getRepositoryRoot(): Promise<string>;
+  resolveRevision(revision: string): Promise<string>;
+  listFilesAtRevision(revision: string): Promise<string[]>;
 }
 
 export interface DependencyAnalyzer {

@@ -31,7 +31,8 @@ describe('GitHub integration', () => {
           title: 'Forbidden architecture dependency',
           message: 'UI may not depend on domain.',
           file: 'src\\ui\\App.ts',
-          line: 7
+          line: 7,
+          fingerprint: 'a'.repeat(64)
         },
         {
           ruleId: 'architecture/dependency',
@@ -75,6 +76,9 @@ describe('GitHub integration', () => {
       locations: [{ physicalLocation: { artifactLocation: { uri: 'src/ui/App.ts' }, region: { startLine: 7 } } }]
     });
     expect(sarif.runs[0].results[1].level).toBe('warning');
+    expect(sarif.runs[0].results[0].partialFingerprints).toEqual({
+      'archguardFingerprint/v1': 'a'.repeat(64)
+    });
   });
 
   it('escapes GitHub workflow annotation data and properties', () => {

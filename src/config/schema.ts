@@ -20,10 +20,20 @@ export const CoverageSchema = z.object({
   forbidOverlappingLayers: z.boolean().optional().default(false)
 }).strict();
 
+export const AuditSchema = z.object({
+  exclude: z.array(z.string()).optional().default([])
+}).strict();
+
+export const BaselineConfigSchema = z.object({
+  path: z.string().min(1)
+}).strict();
+
 export const ConfigSchema = z.object({
   // Currently supported config schema version
   version: z.literal(1),
   coverage: CoverageSchema.optional(),
+  audit: AuditSchema.optional(),
+  baseline: BaselineConfigSchema.optional(),
   layers: z.array(LayerSchema).nonempty(),
   rules: z.array(RuleSchema).optional().default([])
 }).strict();

@@ -1,9 +1,12 @@
 import { ScanResult } from '../types';
 import { Reporter as ReporterInterface } from '../interfaces';
 import { emptyArchitectureImpact } from '../impact/empty';
+import { activeFindings } from '../findings/summary';
+import { findingTextLines } from './findingText';
 
 export interface TerminalReporterOptions {
   detailedImpact?: boolean;
+  showBaseline?: boolean;
 }
 
 function formatChangeType(type: string): string {
@@ -26,6 +29,9 @@ export class TerminalReporter implements ReporterInterface {
 
   async report(result: ScanResult): Promise<void> {
     const findings = result.findings || [];
+    const active = activeFindings(findings);
+    const displayedFindings = this.options.showBaseline ? findings : active;
+    const baselineSuppressed = findings.length - active.length;
     const changes = result.changes || [];
     const comparison = result.comparison ?? { base: 'unknown', head: 'HEAD' };
     const graph = result.dependencyGraph || {};
@@ -93,38 +99,26 @@ export class TerminalReporter implements ReporterInterface {
     console.log('');
 
     console.log('Architecture rules:');
-
-    if (findings.length > 0) {
+    if (baselineSuppressed > 0) {
       console.log('');
-      for (const f of findings) {
-        const header = `${(f.severity || 'info').toUpperCase()} ${f.ruleId || ''}`.trim();
-        console.log(header);
-        if (f.file) {
-          console.log(`${f.file}${f.line ? `:${f.line}` : ''}`);
-        }
-        console.log('');
-        if (f.title) {
-          console.log(f.title);
-          console.log('');
-        }
-        console.log(f.message);
-        if (f.evidence) {
-          console.log('');
-          console.log('Evidence:');
-          console.log(`  ${f.evidence}`);
-        }
-        if (f.suggestion) {
-          console.log('');
-          console.log('Suggestion:');
-          console.log(`  ${f.suggestion}`);
-        }
+      console.log(`  New violations: ${active.length}`);
+      console.log(`  Existing baseline violations: ${baselineSuppressed}`);
+    }
+
+    if (displayedFindings.length > 0) {
+      console.log('');
+      for (const f of displayedFindings) {
+        for (const line of findingTextLines(f)) console.log(line);
+        if (f.baseline?.suppressed) console.log('', '  Baseline: suppressed');
         console.log('');
       }
 
-      console.log(`Total findings: ${findings.length}`);
+      console.log(`Total findings: ${displayedFindings.length}`);
       return;
     }
 
-    console.log('  No violations found.');
+    console.log(active.length === 0 && baselineSuppressed > 0
+      ? '  No new violations found.'
+      : '  No violations found.');
   }
 }

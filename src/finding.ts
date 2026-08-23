@@ -12,4 +12,8 @@ export interface Finding {
   sourceLayer?: string;
   targetLayer?: string;
   suggestion?: string;
+  fingerprint?: string;
+  baseline?: {
+    suppressed: boolean;
+  };
 }

@@ -242,6 +242,7 @@ layers:
         line: 1,
         sourceLayer: 'ui',
         targetLayer: 'domain',
+        fingerprint: expect.any(String),
         evidence: 'src/ui/App.ts -> src/domain/user.ts via "../domain/user"',
         suggestion: 'Depend on an allowed layer or update .archguard.yml.'
       }
@@ -482,6 +483,7 @@ layers:
         line: 1,
         sourceLayer: 'ui',
         targetLayer: 'domain',
+        fingerprint: expect.any(String),
         evidence: 'src/ui/App.ts -> src/domain/user.ts via "../domain/user"',
         suggestion: 'Depend on an allowed layer or update .archguard.yml.'
       }

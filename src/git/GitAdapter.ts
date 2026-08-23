@@ -87,6 +87,25 @@ export class GitAdapterImpl implements GitAdapter {
     return this.ensureGitRepo();
   }
 
+  public async resolveRevision(revision: string): Promise<string> {
+    return this.resolveCommit(revision);
+  }
+
+  public async listFilesAtRevision(revision: string): Promise<string[]> {
+    const repoRoot = await this.ensureGitRepo();
+    const sha = await this.resolveCommit(revision);
+    const { stdout } = await this.runGit(
+      ['ls-tree', '-r', '-z', '--name-only', sha],
+      repoRoot,
+      64 * 1024 * 1024
+    );
+    if (!stdout) return [];
+    return stdout
+      .split('\0')
+      .filter(Boolean)
+      .map(normalizePath);
+  }
+
   private async getRevisionTreeEntry(filePath: string, rev: string): Promise<RevisionTreeEntry | null> {
     const repoRoot = await this.ensureGitRepo();
     const safePath = this.normalizeRepoRelativePath(filePath);

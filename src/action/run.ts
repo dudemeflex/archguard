@@ -13,11 +13,15 @@ export async function runAction(env: NodeJS.ProcessEnv = process.env): Promise<n
 
   const workspace = env.GITHUB_WORKSPACE || process.cwd();
   const configPath = env.INPUT_CONFIG?.trim() || '.archguard.yml';
+  const baselinePath = env.INPUT_BASELINE?.trim() || undefined;
+  const noBaseline = env['INPUT_IGNORE-BASELINE']?.trim().toLowerCase() === 'true';
   const scan = await performScan({
     base: refs.base,
     head: refs.head,
     format: 'github',
     configPath,
+    baselinePath,
+    noBaseline,
     cwd: workspace
   });
 

@@ -15,6 +15,8 @@ import type { Finding } from '../finding';
 import type { ArchitectureImpact, DependencyGraph, ScanResult } from '../types';
 import { isSupportedSourcePath } from '../sourceFiles';
 import { emitOutput } from '../output';
+import { applyBaseline, loadBaseline, resolveBaselineLocation } from '../baseline/store';
+import { summarizeFindings } from '../findings/summary';
 
 export type ScanFormat = 'pretty' | 'json' | 'github' | 'sarif';
 
@@ -26,6 +28,9 @@ export interface ScanOptions {
   configPath?: string;
   strict?: boolean;
   impact?: boolean;
+  baselinePath?: string;
+  noBaseline?: boolean;
+  showBaseline?: boolean;
   cwd?: string;
 }
 
@@ -64,8 +69,9 @@ export async function performScan(opts: ScanOptions): Promise<{ result?: ScanRes
     .filter(filePath => isSupportedSourcePath(filePath));
 
   let dependencyGraph: DependencyGraph = {};
+  let repoRoot: string;
   try {
-    const repoRoot = await git.getRepositoryRoot();
+    repoRoot = await git.getRepositoryRoot();
     const analyzer = new TypeScriptDependencyAnalyzer({ repoRoot, gitAdapter: git });
     dependencyGraph = await analyzer.analyze(relevantFiles, head);
   } catch (err) {
@@ -85,17 +91,24 @@ export async function performScan(opts: ScanOptions): Promise<{ result?: ScanRes
       forbidOverlappingLayers: opts.strict || cfg.coverage?.forbidOverlappingLayers || false
     };
     const coverageFindings = new CoverageRuleEvaluator().evaluate(impact, coveragePolicy);
-    findings = [...dependencyFindings, ...companionFindings, ...coverageFindings];
+    const rawFindings = [...dependencyFindings, ...companionFindings, ...coverageFindings];
+    const baseline = opts.noBaseline
+      ? null
+      : loadBaseline(resolveBaselineLocation(repoRoot, cfg, opts.baselinePath));
+    findings = applyBaseline(rawFindings, baseline);
   } catch (err) {
     return { exitCode: 2, error: (err as Error).message };
   }
 
-  const summary = { errors: 0, warnings: 0, info: 0 };
-  for (const finding of findings) {
-    if (finding.severity === 'error') summary.errors++;
-    else if (finding.severity === 'warning') summary.warnings++;
-    else summary.info++;
-  }
+  const fullSummary = summarizeFindings(findings);
+  const summary = {
+    errors: fullSummary.errors,
+    warnings: fullSummary.warnings,
+    info: fullSummary.info,
+    ...(fullSummary.baselineSuppressed > 0
+      ? { baselineSuppressed: fullSummary.baselineSuppressed }
+      : {})
+  };
 
   const result: ScanResult = {
     comparison: { base, head },
@@ -122,7 +135,10 @@ export async function performScan(opts: ScanOptions): Promise<{ result?: ScanRes
     } else if (format === 'github') {
       await new GithubReporter().report(result);
     } else {
-      await new TerminalReporter({ detailedImpact: opts.impact }).report(result);
+      await new TerminalReporter({
+        detailedImpact: opts.impact,
+        showBaseline: opts.showBaseline
+      }).report(result);
     }
   } catch (err) {
     return { exitCode: 2, error: (err as Error).message };
@@ -140,7 +156,10 @@ export const scanCommand: CommandModule = {
     format: { type: 'string', choices: ['pretty', 'json', 'github', 'sarif'], default: 'pretty', describe: 'Output format' },
     output: { type: 'string', describe: 'Write JSON or SARIF output to a file' },
     strict: { type: 'boolean', default: false, describe: 'Require mapped files and exclusive layer matches for this scan' },
-    impact: { type: 'boolean', default: false, describe: 'Show detailed architecture impact in pretty output' }
+    impact: { type: 'boolean', default: false, describe: 'Show detailed architecture impact in pretty output' },
+    config: { type: 'string', describe: 'Path to the ArchGuard configuration file' },
+    baseline: { type: 'boolean', default: true, describe: 'Use the configured or discovered baseline' },
+    'show-baseline': { type: 'boolean', default: false, describe: 'Show suppressed findings in pretty output' }
   },
   handler: async (argv) => {
     const base = argv.base as string | undefined;
@@ -149,13 +168,24 @@ export const scanCommand: CommandModule = {
     const output = argv.output as string | undefined;
     const strict = argv.strict as boolean;
     const impact = argv.impact as boolean;
+    const configPath = argv.config as string | undefined;
 
     if (!base) {
       console.error('Missing required --base argument');
       process.exit(2);
     }
 
-    const { exitCode, error } = await performScan({ base, head, format, output, strict, impact });
+    const { exitCode, error } = await performScan({
+      base,
+      head,
+      format,
+      output,
+      strict,
+      impact,
+      configPath,
+      noBaseline: argv.baseline === false,
+      showBaseline: argv.showBaseline as boolean
+    });
     if (error) {
       console.error(error);
     }

@@ -1,6 +1,16 @@
-import type { ArchitecturePolicyGraph } from '../../graph/types';
+import type { RenderableArchitectureGraph } from '../../graph/types';
 
-export function renderPrettyGraph(graph: ArchitecturePolicyGraph): string {
+export function renderPrettyGraph(graph: RenderableArchitectureGraph): string {
+  if ('revision' in graph) {
+    const lines = ['Actual architecture', '', `Revision: ${graph.revision}`, '', 'Observed dependencies:'];
+    if (graph.edges.length === 0) lines.push('  (none)');
+    for (const edge of graph.edges) {
+      lines.push(
+        `  ${edge.from} -> ${edge.to}: ${edge.count}${edge.allowed ? '' : ' forbidden'}`
+      );
+    }
+    return lines.join('\n');
+  }
   const lines = ['Architecture'];
   for (const layer of graph.layers) {
     const dependencies = graph.edges

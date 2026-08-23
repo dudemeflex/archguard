@@ -1,14 +1,19 @@
 import type { Reporter } from '../interfaces';
 import type { ScanResult } from '../types';
 import { formatAnnotation } from '../github/workflowCommands';
+import { activeFindings } from '../findings/summary';
 
 export function renderGithub(result: ScanResult): string[] {
-  const findings = result.findings || [];
+  const allFindings = result.findings || [];
+  const findings = activeFindings(allFindings);
+  const baselineSuppressed = allFindings.length - findings.length;
   const summary = result.summary ?? { errors: 0, warnings: 0, info: 0 };
   const lines = findings.map(formatAnnotation);
 
   if (findings.length === 0) {
-    lines.push('ArchGuard: no architecture violations found.');
+    lines.push(baselineSuppressed > 0
+      ? `ArchGuard: no new architecture violations found (${baselineSuppressed} baseline violation(s) suppressed).`
+      : 'ArchGuard: no architecture violations found.');
   } else {
     lines.push(
       `ArchGuard: ${findings.length} architecture violation(s) found `

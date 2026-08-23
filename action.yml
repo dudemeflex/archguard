@@ -13,6 +13,13 @@ inputs:
     description: Repository-relative path to the ArchGuard configuration file
     required: false
     default: .archguard.yml
+  baseline:
+    description: Path to the ArchGuard baseline file
+    required: false
+  ignore-baseline:
+    description: Ignore baseline and report all violations
+    required: false
+    default: "false"
 
 runs:
   using: node20

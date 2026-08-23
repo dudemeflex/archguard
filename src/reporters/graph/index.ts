@@ -1,4 +1,4 @@
-import type { ArchitecturePolicyGraph } from '../../graph/types';
+import type { RenderableArchitectureGraph } from '../../graph/types';
 import { renderDotGraph } from './dot';
 import { renderJsonGraph } from './json';
 import { renderMermaidGraph } from './mermaid';
@@ -7,7 +7,7 @@ import { renderPrettyGraph } from './pretty';
 export type GraphFormat = 'pretty' | 'json' | 'mermaid' | 'dot';
 
 export function renderArchitectureGraph(
-  graph: ArchitecturePolicyGraph,
+  graph: RenderableArchitectureGraph,
   format: GraphFormat
 ): string {
   if (format === 'json') return renderJsonGraph(graph);

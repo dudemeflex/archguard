@@ -62,5 +62,34 @@ export interface ScanResult {
     errors?: number;
     warnings?: number;
     info?: number;
+    baselineSuppressed?: number;
   };
+}
+
+export interface FindingSummary {
+  errors: number;
+  warnings: number;
+  info: number;
+  baselineSuppressed: number;
+}
+
+export interface LayerDependency {
+  from: string;
+  to: string;
+  count: number;
+  allowed: boolean;
+}
+
+export interface AuditResult {
+  revision: string;
+  dependencyGraph: DependencyGraph;
+  findings: Finding[];
+  impact: ArchitectureImpact;
+  layerDependencies: LayerDependency[];
+  stats: {
+    filesAudited: number;
+    edgesAnalyzed: number;
+    layersUsed: number;
+  };
+  summary: FindingSummary;
 }
