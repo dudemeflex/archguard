@@ -268,3 +268,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution workflow and [SECURITY.m
 ## License
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+NOT RELEASED BUILDS CAN CONTAIN BUGS AND EXPLOITS, PLEASE USE THEM ON YOU OWN RISK!
