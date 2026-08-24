@@ -1,7 +1,7 @@
 {
   "name": "archguard",
   "version": "0.1.0",
-  "description": "Deterministic CLI for Git change detection and architecture rule enforcement",
+  "description": "Enforce repository architecture rules across Git changes and complete revisions",
   "main": "dist/src/index.js",
   "repository": {
     "type": "git",
@@ -15,12 +15,14 @@
     "archguard": "dist/src/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "clean": "node scripts/clean.cjs",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "build:action": "ncc build src/action/index.ts -o action-dist --minify --transpile-only --no-source-map-register",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build && npm run build:action",
     "test": "vitest --run",
-    "lint": "eslint \"src/**/*.{ts,js}\" \"test/**/*.{ts,js}\" --max-warnings=0"
+    "lint": "eslint \"src/**/*.{ts,js}\" \"test/**/*.{ts,js}\" --max-warnings=0",
+    "prepack": "npm run build"
   },
   "keywords": [
     "architecture",
@@ -35,15 +37,12 @@
     "scanner",
     "cli"
   ],
-  "author": "",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=20"
   },
   "files": [
-    "dist",
-    "action-dist",
-    "action.yml",
+    "dist/src",
     "README.md",
     "LICENSE"
   ],
@@ -55,16 +54,16 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.0",
     "@types/js-yaml": "^4.0.5",
     "@types/node": "^20.5.6",
     "@types/picomatch": "^2.3.3",
     "@types/yargs": "^17.0.18",
-    "@typescript-eslint/eslint-plugin": "^6.10.0",
-    "@typescript-eslint/parser": "^6.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "@vercel/ncc": "^0.45.0",
-    "eslint": "^8.50.0",
-    "source-map-support": "^0.5.21",
-    "ts-node": "^10.9.1",
-    "vitest": "^1.4.3"
+    "eslint": "^10.0.0",
+    "globals": "^16.0.0",
+    "vitest": "^3.2.7"
   }
 }

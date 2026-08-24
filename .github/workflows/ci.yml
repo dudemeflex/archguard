@@ -4,9 +4,13 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js
@@ -25,5 +29,5 @@ jobs:
         run: npm run build
       - name: Build action bundle
         run: npm run build:action
-    permissions:
-      contents: read
+      - name: Verify package contents
+        run: npm pack --dry-run

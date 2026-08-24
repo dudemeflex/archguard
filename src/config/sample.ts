@@ -5,6 +5,10 @@ coverage:
   requireMappedChangedFiles: false
   forbidOverlappingLayers: false
 
+audit:
+  exclude:
+    - "generated/**"
+
 layers:
   - name: ui
     matches:

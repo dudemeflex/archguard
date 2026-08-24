@@ -1,5 +1,5 @@
 name: ArchGuard
-description: Enforce repository architecture rules on changed JavaScript and TypeScript files
+description: Enforce repository architecture rules for JavaScript and TypeScript
 author: ArchGuard contributors
 
 inputs:

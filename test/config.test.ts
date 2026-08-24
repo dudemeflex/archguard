@@ -14,7 +14,7 @@ function setup(contents: string) {
 function cleanup() {
   try {
     if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
-  } catch (e) {
+  } catch {
     // ignore
   }
 }

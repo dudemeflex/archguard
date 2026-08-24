@@ -68,7 +68,7 @@ export async function performScan(opts: ScanOptions): Promise<{ result?: ScanRes
     .map(change => change.path)
     .filter(filePath => isSupportedSourcePath(filePath));
 
-  let dependencyGraph: DependencyGraph = {};
+  let dependencyGraph: DependencyGraph;
   let repoRoot: string;
   try {
     repoRoot = await git.getRepositoryRoot();
